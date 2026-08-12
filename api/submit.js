@@ -1,4 +1,3 @@
-const { put } = require('@vercel/blob');
 const { readConfig } = require('./_lib');
 
 function clean(value, max = 2000) {
@@ -15,7 +14,6 @@ function sendJson(res, data, status = 200, extraHeaders = {}) {
 async function readRequestBody(req) {
   // Vercel Node.js functions use IncomingMessage. Read the raw request body directly.
   if (req.body && typeof req.body === 'object') return req.body;
-  if (typeof req.json === 'function') return req.json();
 
   return await new Promise((resolve, reject) => {
     let raw = '';
@@ -36,7 +34,8 @@ async function readRequestBody(req) {
 }
 
 async function sendNotification(submission, email) {
-  if (!process.env.RESEND_API_KEY || !email || !process.env.FROM_EMAIL) return false;
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || !email) return false;
 
   const subject = `Nueva solicitud de cita — ${submission.nombre} ${submission.apellido}`;
   const text = [
@@ -48,6 +47,8 @@ async function sendNotification(submission, email) {
     `Método de pago preferido: ${submission.metodo_pago}`,
     `Tarifa indicada: $135.00 USD`,
     `El método de pago es solo una preferencia; no se procesó ningún pago ni se solicitaron datos bancarios.`,
+    '',
+    `ID de solicitud: ${submission.id}`,
   ].join('\n');
 
   const controller = new AbortController();
@@ -57,11 +58,13 @@ async function sendNotification(submission, email) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: process.env.FROM_EMAIL,
+        // Resend's onboarding sender works for the account owner's test recipient.
+        // A verified FROM_EMAIL can be supplied in Vercel later without changing code.
+        from: process.env.FROM_EMAIL || 'onboarding@resend.dev',
         to: [email],
         subject,
         text,
@@ -155,39 +158,27 @@ module.exports = async function handler(req, res) {
       terminosAceptados: true,
     };
 
-    let stored = false;
-    try {
-      await put(`submissions/${id}.json`, JSON.stringify(submission), {
-        access: 'private',
-        contentType: 'application/json; charset=utf-8',
-        addRandomSuffix: false,
-      });
-      stored = true;
-    } catch (storageError) {
-      if (!/No blob credentials found/i.test(String(storageError?.message))) throw storageError;
-      console.warn('Private Blob storage is not configured; using configured email destination.');
-    }
-
+    // Email is now the primary delivery mechanism. The public submission path no
+    // longer waits on optional Vercel Blob storage, which caused 300-second timeouts.
     let notified = false;
-    if (process.env.RESEND_API_KEY && config.notificationEmail && process.env.FROM_EMAIL) {
-      try {
-        notified = await sendNotification(submission, config.notificationEmail);
-      } catch (notificationError) {
-        console.error('notification error:', notificationError);
-      }
+    try {
+      notified = await sendNotification(submission, config.notificationEmail);
+    } catch (notificationError) {
+      console.error('notification error:', notificationError);
     }
 
-    if (!stored && !notified) {
+    if (!notified) {
       return sendJson(
         res,
-        { error: 'El destino seguro de solicitudes no está configurado. Configura Vercel Blob o Resend antes de recibir solicitudes.' },
+        { error: 'No se pudo enviar la solicitud por correo. Verifica la configuración de Resend.' },
         503,
       );
     }
 
     return sendJson(res, {
       ok: true,
-      deliveredTo: stored && notified ? 'storage-and-email' : stored ? 'secure-storage' : 'email',
+      deliveredTo: 'email',
+      message: 'Solicitud enviada correctamente.',
     });
   } catch (error) {
     console.error('submit error:', error);
@@ -207,5 +198,3 @@ module.exports = async function handler(req, res) {
 function cryptoRandom() {
   return Math.random().toString(36).slice(2, 10);
 }
-
-// Deployment trigger: keep this endpoint on the current Vercel Node response implementation.
