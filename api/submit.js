@@ -5,6 +5,27 @@ function clean(value, max = 2000) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+async function readRequestBody(req) {
+  // Vercel's Node.js runtime supplies IncomingMessage, not a Web Request.
+  if (typeof req.json === 'function') return req.json();
+  return await new Promise((resolve, reject) => {
+    let raw = '';
+    req.setEncoding?.('utf8');
+    req.on('data', chunk => {
+      raw += chunk;
+      if (raw.length > 200000) reject(new Error('Request body too large.'));
+    });
+    req.on('end', () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        reject(new Error('Invalid JSON body.'));
+      }
+    });
+    req.on('error', reject);
+  });
+}
+
 async function sendNotification(submission, email) {
   if (!process.env.RESEND_API_KEY || !email || !process.env.FROM_EMAIL) return false;
   const subject = `Nueva solicitud de cita — ${submission.nombre} ${submission.apellido}`;
@@ -18,16 +39,23 @@ async function sendNotification(submission, email) {
     `Tarifa indicada: $135.00 USD`,
     `El método de pago es solo una preferencia; no se procesó ningún pago ni se solicitaron datos bancarios.`,
   ].join('\n');
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: process.env.FROM_EMAIL, to: [email], subject, text }),
-  });
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '');
-    throw new Error(`Notification provider rejected the request (${response.status}): ${detail.slice(0, 300)}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: process.env.FROM_EMAIL, to: [email], subject, text }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      throw new Error(`Notification provider rejected the request (${response.status}): ${detail.slice(0, 300)}`);
+    }
+    return true;
+  } finally {
+    clearTimeout(timeout);
   }
-  return true;
 }
 
 module.exports = async function handler(req) {
@@ -35,7 +63,7 @@ module.exports = async function handler(req) {
   if (methodError) return methodError;
 
   try {
-    const body = await req.json();
+    const body = await readRequestBody(req);
     if (clean(body.website, 100)) return json({ ok: true }, 200);
 
     const required = ['nombre','apellido','telefono','email','fecha','hora','visita','pago100','metodo_pago'];
@@ -98,7 +126,11 @@ module.exports = async function handler(req) {
 
     let notified = false;
     if (process.env.RESEND_API_KEY && config.notificationEmail && process.env.FROM_EMAIL) {
-      notified = await sendNotification(submission, config.notificationEmail);
+      try {
+        notified = await sendNotification(submission, config.notificationEmail);
+      } catch (notificationError) {
+        console.error('notification error:', notificationError);
+      }
     }
 
     if (!stored && !notified) {
@@ -108,7 +140,7 @@ module.exports = async function handler(req) {
     return json({ ok: true, deliveredTo: stored && notified ? 'storage-and-email' : stored ? 'secure-storage' : 'email' });
   } catch (error) {
     console.error('submit error:', error);
-    return json({ error: 'No se pudo enviar la solicitud. Inténtalo de nuevo.' }, 500);
+    return json({ error: error.message === 'Invalid JSON body.' ? 'La solicitud no tiene un formato válido.' : 'No se pudo enviar la solicitud. Inténtalo de nuevo.' }, 500);
   }
 };
 
