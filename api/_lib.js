@@ -1,8 +1,6 @@
 const crypto = require('node:crypto');
-const { put, list, get } = require('@vercel/blob');
 
 const COOKIE_NAME = 'admin_session';
-const CONFIG_PATH = 'config/settings.json';
 
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -44,20 +42,19 @@ function sessionCookie(value, maxAge = 60 * 60 * 8) {
   return `${COOKIE_NAME}=${encodeURIComponent(value)}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
 
-async function readJsonBlob(path) {
-  try {
-    const result = await get(path, { access: 'private', useCache: false });
-    if (!result?.stream) return null;
-    const text = await new Response(result.stream).text();
-    return JSON.parse(text);
-  } catch (err) {
-    if (err?.status === 404 || /not found/i.test(String(err?.message))) return null;
-    if (/No blob credentials found/i.test(String(err?.message))) return null;
-    throw err;
-  }
+// Public configuration must not depend on Vercel Blob. Blob is optional storage for admin data only.
+async function readConfig() {
+  return {
+    notificationEmail: process.env.NOTIFICATION_EMAIL || 'agenciasinmobiliaria@gmail.com',
+    phone: process.env.CONTACT_PHONE || '+1 (308) 304-1687',
+    office: process.env.CONTACT_OFFICE || 'Cleveland, OH • United States',
+    whatsapp: process.env.CONTACT_WHATSAPP || '',
+    appointmentFee: 135,
+  };
 }
 
 async function writeJsonBlob(path, value) {
+  const { put } = require('@vercel/blob');
   await put(path, JSON.stringify(value, null, 2), {
     access: 'private',
     contentType: 'application/json; charset=utf-8',
@@ -65,25 +62,21 @@ async function writeJsonBlob(path, value) {
   });
 }
 
-async function readConfig() {
-  const stored = await readJsonBlob(CONFIG_PATH);
-  return {
-    notificationEmail: stored?.notificationEmail || process.env.NOTIFICATION_EMAIL || 'agenciasinmobiliaria@gmail.com',
-    phone: stored?.phone || '+1 (308) 304-1687',
-    office: stored?.office || 'Cleveland, OH • United States',
-    whatsapp: stored?.whatsapp || '',
-    appointmentFee: 135,
-  };
-}
-
 async function listSubmissions() {
   try {
+    const { list, get } = require('@vercel/blob');
     const result = await list({ prefix: 'submissions/', limit: 1000 });
     const rows = [];
     for (const blob of result.blobs || []) {
       if (!blob.pathname.endsWith('.json')) continue;
-      const item = await readJsonBlob(blob.pathname);
-      if (item) rows.push(item);
+      try {
+        const itemResult = await get(blob.pathname, { access: 'private', useCache: false });
+        if (!itemResult?.stream) continue;
+        const item = JSON.parse(await new Response(itemResult.stream).text());
+        if (item) rows.push(item);
+      } catch (err) {
+        console.error('submission read error:', err);
+      }
     }
     return rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
   } catch (err) {
