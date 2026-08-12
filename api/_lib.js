@@ -52,6 +52,7 @@ async function readJsonBlob(path) {
     return JSON.parse(text);
   } catch (err) {
     if (err?.status === 404 || /not found/i.test(String(err?.message))) return null;
+    if (/No blob credentials found/i.test(String(err?.message))) return null;
     throw err;
   }
 }
@@ -71,19 +72,24 @@ async function readConfig() {
     phone: stored?.phone || '+1 (308) 304-1687',
     office: stored?.office || 'Cleveland, OH • United States',
     whatsapp: stored?.whatsapp || '',
-    appointmentFee: Number.isFinite(Number(stored?.appointmentFee)) ? Number(stored.appointmentFee) : 135,
+    appointmentFee: 135,
   };
 }
 
 async function listSubmissions() {
-  const result = await list({ prefix: 'submissions/', limit: 1000 });
-  const rows = [];
-  for (const blob of result.blobs || []) {
-    if (!blob.pathname.endsWith('.json')) continue;
-    const item = await readJsonBlob(blob.pathname);
-    if (item) rows.push(item);
+  try {
+    const result = await list({ prefix: 'submissions/', limit: 1000 });
+    const rows = [];
+    for (const blob of result.blobs || []) {
+      if (!blob.pathname.endsWith('.json')) continue;
+      const item = await readJsonBlob(blob.pathname);
+      if (item) rows.push(item);
+    }
+    return rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  } catch (err) {
+    if (/No blob credentials found/i.test(String(err?.message))) return [];
+    throw err;
   }
-  return rows.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
 module.exports = { json, requireMethod, secret, makeSession, validSession, sessionCookie, readConfig, writeJsonBlob, listSubmissions };
