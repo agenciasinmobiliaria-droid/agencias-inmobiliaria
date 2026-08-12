@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Solicitud de Alquiler</title>
+<style>
+  :root{
+    --navy:#101f45;
+    --navy2:#172952;
+    --gold:#e4b43b;
+    --cream:#f8f6f1;
+    --line:#ddd9d1;
+    --text:#111a2d;
+    --muted:#596273;
+    --green:#22d366;
+    --white:#fff;
+    --shadow:0 8px 24px rgba(16,31,69,.10);
+    --radius:28px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    color:var(--text);
+    background:
+      radial-gradient(circle at 80% 12%,rgba(228,180,59,.10),transparent 25%),
+      var(--cream);
+  }
+  .top{
+    padding:22px 16px 10px;
+    text-align:center;
+  }
+  .brand{
+    width:190px;height:88px;margin:auto;border-radius:28px;
+    background:#fff;display:grid;place-items:center;
+    box-shadow:var(--shadow);
+    font-weight:900;letter-spacing:-1px;color:var(--navy);
+    font-size:20px;
+  }
+  .brand small{display:block;font-size:10px;letter-spacing:2px;margin-top:3px}
+  .hero{
+    max-width:900px;margin:18px auto 0;padding:28px 18px 34px;text-align:center;
+  }
+  .eyebrow{
+    display:inline-flex;align-items:center;gap:10px;
+    border:1px solid #c9c9c9;background:#fff;border-radius:999px;
+    padding:10px 20px;font-weight:800;color:var(--navy);letter-spacing:.3px
+  }
+  .eyebrow b{color:var(--gold);font-size:20px}
+  h1{
+    margin:35px 0 18px;font-family:Georgia,serif;
+    font-size:clamp(52px,10vw,86px);line-height:.92;
+    letter-spacing:-4px;color:var(--navy)
+  }
+  .hero p{
+    max-width:760px;margin:0 auto;color:#263757;
+    font-size:clamp(18px,3vw,25px);line-height:1.45
+  }
+  .features{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:18px;
+    max-width:850px;margin:28px auto;
+  }
+  .feature{
+    background:#fff;border:1px solid var(--line);border-radius:28px;
+    padding:26px 14px;min-height:165px;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;
+    box-shadow:var(--shadow)
+  }
+  .icon{font-size:31px;color:var(--gold);margin-bottom:12px}
+  .feature strong{font-size:17px;text-align:center}
+  .whatsapp{
+    display:inline-flex;align-items:center;gap:10px;
+    background:var(--green);color:white;text-decoration:none;
+    padding:17px 28px;border-radius:999px;font-weight:800;font-size:18px;
+    box-shadow:0 8px 20px rgba(34,211,102,.22)
+  }
+  main{max-width:900px;margin:auto;padding:0 16px 50px}
+  .section{
+    background:#fff;border:1px solid var(--line);border-radius:var(--radius);
+    padding:30px;margin:20px 0;box-shadow:var(--shadow)
+  }
+  .section-title{
+    display:flex;align-items:center;gap:18px;margin:0 0 25px;
+    font-family:Georgia,serif;font-size:32px;color:var(--navy)
+  }
+  .section-title .circle{
+    width:62px;height:62px;border-radius:50%;background:var(--navy);
+    color:#fff;display:grid;place-items:center;font-family:system-ui;font-size:27px;
+    flex:0 0 auto
+  }
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .field{margin-bottom:18px}
+  .field.full{grid-column:1/-1}
+  label,.question{display:block;font-weight:750;font-size:17px;margin-bottom:9px}
+  .req{color:#d21f2f}
+  input,select,textarea{
+    width:100%;border:1px solid var(--line);border-radius:22px;
+    background:#fff;padding:17px 20px;font:inherit;font-size:17px;
+    outline:none;transition:.2s
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(16,31,69,.08)}
+  textarea{min-height:110px;resize:vertical}
+  .choice{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .choice input{display:none}
+  .choice label{
+    border:1px solid var(--line);border-radius:22px;padding:17px;text-align:center;
+    cursor:pointer;margin:0;background:#fff;font-weight:700
+  }
+  .choice input:checked+label{border:2px solid var(--navy);background:#f8f9fc}
+  .info{
+    background:#fbfaf6;border:1px solid var(--line);border-radius:22px;
+    padding:20px;line-height:1.6;color:#414b5d
+  }
+  .info strong{color:var(--text)}
+  .notice{
+    border-left:4px solid var(--gold);padding:14px 18px;background:#fffaf0;
+    border-radius:12px;margin-top:18px
+  }
+  .terms{display:flex;gap:12px;align-items:flex-start;margin-top:20px}
+  .terms input{width:24px;height:24px;margin:2px 0 0;flex:0 0 auto}
+  .submit{
+    width:100%;border:0;background:var(--navy);color:white;
+    padding:21px;border-radius:30px;font-size:21px;font-weight:800;cursor:pointer
+  }
+  .secure{text-align:center;color:#697385;margin:18px 0 0}
+  footer{background:var(--navy);color:#fff;padding:42px 22px}
+  .footer-inner{max-width:900px;margin:auto;display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+  footer h3{margin:0 0 7px;color:#aeb8cc;font-size:15px;font-weight:600}
+  footer p{margin:0;font-size:17px}
+  .float{
+    position:fixed;right:20px;bottom:20px;width:62px;height:62px;border-radius:50%;
+    display:grid;place-items:center;background:var(--green);color:#fff;
+    font-size:30px;box-shadow:0 8px 25px rgba(0,0,0,.18);z-index:5;text-decoration:none
+  }
+  .demo{
+    position:fixed;left:12px;bottom:12px;background:#111;color:#fff;
+    padding:9px 13px;border-radius:12px;font-size:12px;z-index:6;opacity:.9
+  }
+  @media(max-width:700px){
+    .features,.grid,.footer-inner{grid-template-columns:1fr}
+    .hero{padding-top:18px}
+    h1{letter-spacing:-3px}
+    .section{padding:24px 18px;border-radius:24px}
+    .section-title{font-size:27px}
+    .feature{min-height:130px}
+  }
+</style>
+</head>
+<body>
+
+
+<header class="top">
+  <div class="brand">RENTAL<br><small>PROPERTY SERVICES</small></div>
+  <div class="hero">
+    <div class="eyebrow"><b>✓</b> PROGRAMA DE RENTA CERTIFICADA</div>
+    <h1>Solicitud de<br>Alquiler</h1>
+    <p>Reserva tu cita para visitar la propiedad. Proceso claro, profesional y con información transparente.</p>
+    <div class="features">
+      <div class="feature"><div class="icon">♢</div><strong>Proceso transparente</strong></div>
+      <div class="feature"><div class="icon">◷</div><strong>Cita en 30 minutos</strong></div>
+      <div class="feature"><div class="icon">✓</div><strong>Agente autorizado</strong></div>
+    </div>
+    <a class="whatsapp" href="mailto:agenciasinmobiliaria@gmail.com" target="_blank" rel="noopener">◉ &nbsp; Contactar por WhatsApp</a>
+  </div>
+</header>
+
+<main>
+  <form id="rentalForm">
+    <section class="section">
+      <h2 class="section-title"><span class="circle">♙</span>Información personal</h2>
+      <div class="grid">
+        <div class="field"><label>Nombre <span class="req">*</span></label><input required name="nombre" placeholder="Nombre"></div>
+        <div class="field"><label>Apellido <span class="req">*</span></label><input required name="apellido" placeholder="Apellido"></div>
+        <div class="field"><label>Teléfono <span class="req">*</span></label><input required type="tel" name="telefono" placeholder="+1 (308) 304-1687"></div>
+        <div class="field"><label>E-mail <span class="req">*</span></label><input required type="email" name="email" placeholder="ejemplo@ejemplo.com"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title"><span class="circle">▣</span>Detalles de la cita</h2>
+      <div class="grid">
+        <div class="field"><label>Fecha de la cita <span class="req">*</span></label><input required type="date" name="fecha"></div>
+        <div class="field"><label>Hora preferida <span class="req">*</span></label>
+          <select required name="hora"><option value="">Selecciona una hora</option><option>9:00 AM</option><option>10:00 AM</option><option>11:00 AM</option><option>1:00 PM</option><option>2:00 PM</option><option>3:00 PM</option><option>4:00 PM</option></select>
+        </div>
+        <div class="field full"><span class="question">¿Cómo deseas realizar la visita? <span class="req">*</span></span>
+          <div class="choice">
+            <input id="presencial" type="radio" name="visita" value="Presencial" required><label for="presencial">♙ &nbsp; Presencial</label>
+            <input id="virtual" type="radio" name="visita" value="Virtual"><label for="virtual">▣ &nbsp; Virtual</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title"><span class="circle">✓</span>Información del inquilino</h2>
+      <div class="grid">
+        <div class="field full"><span class="question">¿Eres ciudadano/a americano?</span>
+          <div class="choice"><input id="usa1" type="radio" name="ciudadano" value="Sí"><label for="usa1">Sí</label><input id="usa2" type="radio" name="ciudadano" value="No"><label for="usa2">No</label></div>
+        </div>
+        <div class="field"><label>¿Cuántas personas vivirán en la unidad?</label><input type="number" min="1" name="personas" placeholder="Ej: 2"></div>
+        <div class="field"><label>¿Por cuánto tiempo quieres contratar?</label><input name="duracion" placeholder="Ej: 12 meses"></div>
+        <div class="field full"><label>¿Cuál es la fecha más temprana en la que puedes mudarte?</label><input type="date" name="mudanza"></div>
+        <div class="field full"><span class="question">¿Fumas tú o alguien que vivirá en la propiedad?</span>
+          <div class="choice"><input id="fum1" type="radio" name="fuma" value="Sí"><label for="fum1">Sí</label><input id="fum2" type="radio" name="fuma" value="No"><label for="fum2">No</label></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title"><span class="circle">▢</span>Empleo e ingresos</h2>
+      <div class="grid">
+        <div class="field full"><span class="question">¿Estás empleado/a actualmente?</span>
+          <div class="choice"><input id="emp1" type="radio" name="empleado" value="Sí"><label for="emp1">Sí</label><input id="emp2" type="radio" name="empleado" value="No"><label for="emp2">No</label></div>
+        </div>
+        <div class="field"><label>Nombre de la compañía</label><input name="empresa" placeholder="Nombre de la empresa"></div>
+        <div class="field"><label>Ingreso mensual o semanal (USD)</label><input type="number" min="0" step="0.01" name="ingreso" placeholder="0.00"></div>
+        <div class="field full"><label>¿Cuánto tienes disponible para asegurar la propiedad? (USD)</label><input type="number" min="0" step="0.01" name="disponible" placeholder="0.00"></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title"><span class="circle">♡</span>Información adicional</h2>
+      <div class="grid">
+        <div class="field full"><span class="question">¿Tienes mascotas?</span>
+          <div class="choice"><input id="pet1" type="radio" name="mascotas" value="Sí"><label for="pet1">Sí</label><input id="pet2" type="radio" name="mascotas" value="No"><label for="pet2">No</label></div>
+        </div>
+        <div class="field full"><label>Comentarios o información adicional</label><textarea name="comentarios" placeholder="Escribe aquí..."></textarea></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title"><span class="circle">▤</span>Programa de cita certificada</h2>
+      <div class="info">
+        <strong>Tarifa de cita: $135.00 USD</strong><br>
+        La tarifa de reserva de la cita se muestra aquí como parte del flujo de demostración. Si se utiliza en una operación real, deben indicarse claramente las condiciones de cobro, reembolso, identidad legal del proveedor y comprobante de pago.
+      </div>
+      <div class="grid" style="margin-top:18px">
+        <div class="field">
+          <label>¿Pagarás la cita certificada de $135.00 USD? <span class="req">*</span></label>
+          <div class="choice">
+            <input id="pay1" type="radio" name="pago100" value="Sí" required><label for="pay1">Sí</label>
+            <input id="pay2" type="radio" name="pago100" value="No"><label for="pay2">No</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Método de pago <span class="req">*</span></label>
+          <select required name="metodo_pago">
+            <option value="">Selecciona un método</option>
+            <option>Zelle</option>
+            <option>Cash App</option>
+            <option>PayPal</option>
+            <option>Tarjeta de crédito/débito</option>
+            <option>Transferencia bancaria</option>
+            <option>Otro método autorizado</option>
+          </select>
+        </div>
+      </div>
+      <div class="notice">
+        <strong>$135.00 USD — Tarifa de cita.</strong><br>
+        Esta versión no captura datos de tarjeta ni procesa el cobro. Para producción, conecta únicamente un procesador de pagos legítimo y muestra su recibo y política de reembolso.
+      </div>
+      <label class="terms"><input required type="checkbox" name="terminos"><span>He leído y acepto los términos, las condiciones de la cita y la política de privacidad.</span></label>
+    </section>
+
+    <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;opacity:0">
+    <button class="submit" type="submit">Enviar solicitud</button>
+    <div id="formStatus" class="secure" role="status" aria-live="polite"></div>
+    <div class="secure">🔒 Tus datos deben enviarse únicamente a un sistema seguro y autorizado.</div>
+  </form>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <div><h3>Llámanos</h3><p>+1 (308) 304-1687</p></div>
+    <div><h3>Escríbenos</h3><p>agenciasinmobiliaria@gmail.com</p></div>
+    <div><h3>Oficina</h3><p>Cleveland, OH • United States</p></div>
+  </div>
+</footer>
+
+<a class="float" href="mailto:agenciasinmobiliaria@gmail.com" target="_blank" rel="noopener" aria-label="Escribir por correo">✉</a>
+
+<script>
+document.getElementById('rentalForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  if(!this.reportValidity()) return;
+
+  const form = this;
+  const button = form.querySelector('.submit');
+  const status = document.getElementById('formStatus');
+  button.disabled = true;
+  button.textContent = 'Enviando solicitud…';
+  status.textContent = '';
+
+  try {
+    const response = await fetch('/api/submit', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(Object.fromEntries(new FormData(form)))
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'No se pudo enviar la solicitud.');
+    form.reset();
+    status.textContent = 'Solicitud enviada correctamente. Te contactaremos para confirmar la cita.';
+    status.style.color = '#167a45';
+  } catch (error) {
+    status.textContent = error.message || 'Ocurrió un error. Inténtalo de nuevo.';
+    status.style.color = '#b42318';
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Enviar solicitud';
+  }
+});
+</script>
+<script>
+(async()=>{try{const r=await fetch('/api/config');if(!r.ok)return;const c=await r.json();document.querySelectorAll('footer .footer-inner div p')[0].textContent=c.phone||'';document.querySelectorAll('footer .footer-inner div p')[2].textContent=c.office||'';const fee=Number(c.appointmentFee||100).toFixed(2);document.querySelectorAll('.info strong').forEach(el=>el.textContent=`Tarifa de cita: $${fee} USD`);document.querySelectorAll('.notice strong').forEach(el=>el.textContent=`$${fee} USD — Tarifa de cita.`);const wa=(c.whatsapp||'').replace(/\D/g,'');if(wa){document.querySelectorAll('.whatsapp,.float').forEach(a=>{a.href=`https://wa.me/${wa}`;a.removeAttribute('target')})}}catch(e){console.error(e)}})();
+</script>
+</body>
+</html>
