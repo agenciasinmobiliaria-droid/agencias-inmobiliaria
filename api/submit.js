@@ -5,6 +5,31 @@ function clean(value, max = 2000) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+async function sendNotification(submission, email) {
+  if (!process.env.RESEND_API_KEY || !email || !process.env.FROM_EMAIL) return false;
+  const subject = `Nueva solicitud de cita — ${submission.nombre} ${submission.apellido}`;
+  const text = [
+    subject,
+    `Fecha: ${submission.fecha} ${submission.hora}`,
+    `Visita: ${submission.visita}`,
+    `Teléfono: ${submission.telefono}`,
+    `Email: ${submission.email}`,
+    `Método de pago preferido: ${submission.metodo_pago}`,
+    `Tarifa indicada: $135.00 USD`,
+    `El método de pago es solo una preferencia; no se procesó ningún pago ni se solicitaron datos bancarios.`,
+  ].join('\n');
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: process.env.FROM_EMAIL, to: [email], subject, text }),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(`Notification provider rejected the request (${response.status}): ${detail.slice(0, 300)}`);
+  }
+  return true;
+}
+
 module.exports = async function handler(req) {
   const methodError = requireMethod(req, 'POST');
   if (methodError) return methodError;
@@ -58,39 +83,32 @@ module.exports = async function handler(req) {
       terminosAceptados: true,
     };
 
-    await put(`submissions/${id}.json`, JSON.stringify(submission), {
-      access: 'private',
-      contentType: 'application/json; charset=utf-8',
-      addRandomSuffix: false,
-    });
-
-    if (process.env.RESEND_API_KEY && config.notificationEmail && process.env.FROM_EMAIL) {
-      const safeSubject = `Nueva solicitud de cita — ${submission.nombre} ${submission.apellido}`;
-      const text = [
-        safeSubject,
-        `Fecha: ${submission.fecha} ${submission.hora}`,
-        `Visita: ${submission.visita}`,
-        `Teléfono: ${submission.telefono}`,
-        `Email: ${submission.email}`,
-        `Método de pago preferido: ${submission.metodo_pago}`,
-        `Tarifa indicada: $135.00 USD`,
-        `El método de pago es solo una preferencia; no se procesó ningún pago ni se solicitaron datos bancarios.`,
-      ].join('\n');
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: process.env.FROM_EMAIL, to: [config.notificationEmail], subject: safeSubject, text }),
-        });
-      } catch (mailError) {
-        console.error('Notification email failed after storing submission:', mailError);
-      }
+    let stored = false;
+    try {
+      await put(`submissions/${id}.json`, JSON.stringify(submission), {
+        access: 'private',
+        contentType: 'application/json; charset=utf-8',
+        addRandomSuffix: false,
+      });
+      stored = true;
+    } catch (storageError) {
+      if (!/No blob credentials found/i.test(String(storageError?.message))) throw storageError;
+      console.warn('Private Blob storage is not configured; using configured email destination.');
     }
 
-    return json({ ok: true });
+    let notified = false;
+    if (process.env.RESEND_API_KEY && config.notificationEmail && process.env.FROM_EMAIL) {
+      notified = await sendNotification(submission, config.notificationEmail);
+    }
+
+    if (!stored && !notified) {
+      return json({ error: 'El destino seguro de solicitudes no está configurado. Configura Vercel Blob o Resend antes de recibir solicitudes.' }, 503);
+    }
+
+    return json({ ok: true, deliveredTo: stored && notified ? 'storage-and-email' : stored ? 'secure-storage' : 'email' });
   } catch (error) {
     console.error('submit error:', error);
-    return json({ error: 'No se pudo guardar la solicitud. Inténtalo de nuevo.' }, 500);
+    return json({ error: 'No se pudo enviar la solicitud. Inténtalo de nuevo.' }, 500);
   }
 };
 
