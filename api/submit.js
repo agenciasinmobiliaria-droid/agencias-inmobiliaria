@@ -207,3 +207,5 @@ module.exports = async function handler(req, res) {
 function cryptoRandom() {
   return Math.random().toString(36).slice(2, 10);
 }
+
+// Deployment trigger: keep this endpoint on the current Vercel Node response implementation.
