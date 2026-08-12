@@ -1,13 +1,22 @@
 const { put } = require('@vercel/blob');
-const { json, requireMethod, readConfig } = require('./_lib');
+const { readConfig } = require('./_lib');
 
 function clean(value, max = 2000) {
   return String(value ?? '').trim().slice(0, max);
 }
 
+function sendJson(res, data, status = 200, extraHeaders = {}) {
+  res.statusCode = status;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  for (const [key, value] of Object.entries(extraHeaders)) res.setHeader(key, value);
+  res.end(JSON.stringify(data));
+}
+
 async function readRequestBody(req) {
-  // Vercel's Node.js runtime supplies IncomingMessage, not a Web Request.
+  // Vercel Node.js functions use IncomingMessage. Read the raw request body directly.
+  if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.json === 'function') return req.json();
+
   return await new Promise((resolve, reject) => {
     let raw = '';
     req.setEncoding?.('utf8');
@@ -28,6 +37,7 @@ async function readRequestBody(req) {
 
 async function sendNotification(submission, email) {
   if (!process.env.RESEND_API_KEY || !email || !process.env.FROM_EMAIL) return false;
+
   const subject = `Nueva solicitud de cita — ${submission.nombre} ${submission.apellido}`;
   const text = [
     subject,
@@ -39,15 +49,26 @@ async function sendNotification(submission, email) {
     `Tarifa indicada: $135.00 USD`,
     `El método de pago es solo una preferencia; no se procesó ningún pago ni se solicitaron datos bancarios.`,
   ].join('\n');
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
+
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: process.env.FROM_EMAIL, to: [email], subject, text }),
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: process.env.FROM_EMAIL,
+        to: [email],
+        subject,
+        text,
+      }),
       signal: controller.signal,
     });
+
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       throw new Error(`Notification provider rejected the request (${response.status}): ${detail.slice(0, 300)}`);
@@ -58,32 +79,55 @@ async function sendNotification(submission, email) {
   }
 }
 
-module.exports = async function handler(req) {
-  const methodError = requireMethod(req, 'POST');
-  if (methodError) return methodError;
+module.exports = async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return sendJson(res, { error: 'Método no permitido.' }, 405, { Allow: 'POST' });
+  }
 
   try {
     const body = await readRequestBody(req);
-    if (clean(body.website, 100)) return json({ ok: true }, 200);
 
-    const required = ['nombre','apellido','telefono','email','fecha','hora','visita','pago100','metodo_pago'];
+    // Honeypot anti-spam.
+    if (clean(body.website, 100)) return sendJson(res, { ok: true }, 200);
+
+    const required = ['nombre', 'apellido', 'telefono', 'email', 'fecha', 'hora', 'visita', 'pago100', 'metodo_pago'];
     for (const key of required) {
-      if (!clean(body[key], 300)) return json({ error: `Falta el campo: ${key}.` }, 400);
-    }
-    if (body.terminos !== 'on' && body.terminos !== true && body.terminos !== 'true') {
-      return json({ error: 'Debes aceptar los términos y la política de privacidad.' }, 400);
+      if (!clean(body[key], 300)) return sendJson(res, { error: `Falta el campo: ${key}.` }, 400);
     }
 
-    const allowedMethods = ['Zelle','Cash App','PayPal','Tarjeta de crédito/débito','Transferencia bancaria','Otro método autorizado'];
-    if (!allowedMethods.includes(clean(body.metodo_pago, 100))) return json({ error: 'Método de pago no válido.' }, 400);
-    if (!['Presencial','Virtual'].includes(clean(body.visita, 50))) return json({ error: 'Tipo de visita no válido.' }, 400);
-    if (!['Sí','No'].includes(clean(body.pago100, 20))) return json({ error: 'Respuesta de tarifa no válida.' }, 400);
-    if (!/^\S+@\S+\.\S+$/.test(clean(body.email, 254))) return json({ error: 'Correo electrónico no válido.' }, 400);
-    if (clean(body.comentarios, 5000).match(/<\s*script/i)) return json({ error: 'Contenido no válido.' }, 400);
+    if (body.terminos !== 'on' && body.terminos !== true && body.terminos !== 'true') {
+      return sendJson(res, { error: 'Debes aceptar los términos y la política de privacidad.' }, 400);
+    }
+
+    const allowedMethods = [
+      'Zelle',
+      'Cash App',
+      'PayPal',
+      'Tarjeta de crédito/débito',
+      'Transferencia bancaria',
+      'Otro método autorizado',
+    ];
+
+    if (!allowedMethods.includes(clean(body.metodo_pago, 100))) {
+      return sendJson(res, { error: 'Método de pago no válido.' }, 400);
+    }
+    if (!['Presencial', 'Virtual'].includes(clean(body.visita, 50))) {
+      return sendJson(res, { error: 'Tipo de visita no válido.' }, 400);
+    }
+    if (!['Sí', 'No'].includes(clean(body.pago100, 20))) {
+      return sendJson(res, { error: 'Respuesta de tarifa no válida.' }, 400);
+    }
+    if (!/^\S+@\S+\.\S+$/.test(clean(body.email, 254))) {
+      return sendJson(res, { error: 'Correo electrónico no válido.' }, 400);
+    }
+    if (clean(body.comentarios, 5000).match(/<\s*script/i)) {
+      return sendJson(res, { error: 'Contenido no válido.' }, 400);
+    }
 
     const config = await readConfig();
     const now = new Date().toISOString();
     const id = `${Date.now()}-${cryptoRandom()}`;
+
     const submission = {
       id,
       createdAt: now,
@@ -134,13 +178,29 @@ module.exports = async function handler(req) {
     }
 
     if (!stored && !notified) {
-      return json({ error: 'El destino seguro de solicitudes no está configurado. Configura Vercel Blob o Resend antes de recibir solicitudes.' }, 503);
+      return sendJson(
+        res,
+        { error: 'El destino seguro de solicitudes no está configurado. Configura Vercel Blob o Resend antes de recibir solicitudes.' },
+        503,
+      );
     }
 
-    return json({ ok: true, deliveredTo: stored && notified ? 'storage-and-email' : stored ? 'secure-storage' : 'email' });
+    return sendJson(res, {
+      ok: true,
+      deliveredTo: stored && notified ? 'storage-and-email' : stored ? 'secure-storage' : 'email',
+    });
   } catch (error) {
     console.error('submit error:', error);
-    return json({ error: error.message === 'Invalid JSON body.' ? 'La solicitud no tiene un formato válido.' : 'No se pudo enviar la solicitud. Inténtalo de nuevo.' }, 500);
+    return sendJson(
+      res,
+      {
+        error:
+          error.message === 'Invalid JSON body.'
+            ? 'La solicitud no tiene un formato válido.'
+            : 'No se pudo enviar la solicitud. Inténtalo de nuevo.',
+      },
+      500,
+    );
   }
 };
 
